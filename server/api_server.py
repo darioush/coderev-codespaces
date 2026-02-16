@@ -192,6 +192,13 @@ async def ask(req: AskRequest, authorization: str | None = Header(None)):
     return AskResponse(answer=answer, session_id=session_id, usage=usage, duration_seconds=round(elapsed, 2))
 
 
+def _claude_env() -> dict:
+    """Build env for Claude subprocess, stripping ANTHROPIC_API_KEY so it uses OAuth."""
+    env = os.environ.copy()
+    env.pop("ANTHROPIC_API_KEY", None)
+    return env
+
+
 async def _run_claude(req: AskRequest) -> subprocess.CompletedProcess:
     cmd = _build_claude_cmd(req)
     proc = await asyncio.to_thread(
@@ -200,7 +207,8 @@ async def _run_claude(req: AskRequest) -> subprocess.CompletedProcess:
         capture_output=True,
         text=True,
         cwd=REPO_DIR,
-        timeout=120,
+        env=_claude_env(),
+        timeout=300,
     )
     if proc.returncode != 0 and not proc.stdout:
         raise HTTPException(
@@ -222,6 +230,7 @@ async def ask_stream(req: AskRequest, authorization: str | None = Header(None)):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=REPO_DIR,
+                env=_claude_env(),
             )
             try:
                 async for line in proc.stdout:

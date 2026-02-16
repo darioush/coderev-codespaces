@@ -33,14 +33,24 @@ def get_github_token() -> str:
 
 
 def get_auth_token(base_url: str, codespace_name: str) -> str:
-    """Get auth token — from local cache or by claiming from the server."""
+    """Get auth token — try to claim fresh, fall back to cache."""
+    # Always try to claim first (works if server just started)
+    try:
+        token = _claim_auth_token(base_url)
+        _save_cached_token(codespace_name, token)
+        return token
+    except RuntimeError:
+        pass  # 410 = already claimed
+
+    # Fall back to cached token
     cached = _load_cached_token(codespace_name)
     if cached:
         return cached
 
-    token = _claim_auth_token(base_url)
-    _save_cached_token(codespace_name, token)
-    return token
+    raise RuntimeError(
+        "Auth token already claimed and not in local cache. "
+        "Restart the codespace server to generate a new token."
+    )
 
 
 def _claim_auth_token(base_url: str) -> str:
