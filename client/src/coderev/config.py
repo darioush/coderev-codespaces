@@ -6,5 +6,5 @@ HEALTH_POLL_TIMEOUT = 120
 CODESPACE_POLL_INTERVAL = 5
 CODESPACE_BOOT_TIMEOUT = 300
 CODESPACE_IDLE_TIMEOUT_MINUTES = 30
-ASK_TIMEOUT = 130  # slightly above server-side 120s
+ASK_TIMEOUT = 310  # slightly above server-side 300s
 MACHINE_TYPE = "basicLinux32gb"  # 2-core, good enough for Claude

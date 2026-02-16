@@ -28,7 +28,7 @@ def cli():
 @click.option("--files", "-f", multiple=True, help="Files to focus on")
 @click.option("--diff", "-d", "diff_range", help="Git diff range (e.g. main..HEAD)")
 @click.option("--model", "-m", help="Claude model (e.g. sonnet, opus)")
-@click.option("--max-turns", default=10, help="Max agent turns")
+@click.option("--max-turns", default=30, help="Max agent turns")
 @click.option("--stream", is_flag=True, help="Stream response via SSE")
 def ask(repo, branch, question, files, diff_range, model, max_turns, stream):
     """Ask Claude a question about code in REPO on BRANCH."""

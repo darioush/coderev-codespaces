@@ -20,10 +20,13 @@ ALLOWED_TOOLS = [
     "Read",
     "Glob",
     "Grep",
-    "Bash(git diff*)",
-    "Bash(git log*)",
-    "Bash(git show*)",
-    "Bash(git blame*)",
+    "Bash(git *)",
+    "Bash(cargo *)",
+    "Bash(ls *)",
+    "Bash(find *)",
+    "Bash(wc *)",
+    "Bash(head *)",
+    "Bash(tail *)",
 ]
 
 app = FastAPI(title="coderev")
@@ -86,7 +89,7 @@ class AskRequest(BaseModel):
     files: list[str] = Field(default_factory=list)
     diff_range: str | None = None
     model: str | None = None
-    max_turns: int = 10
+    max_turns: int = 30
 
 
 class AskResponse(BaseModel):
@@ -128,7 +131,7 @@ async def ask(req: AskRequest, authorization: str | None = Header(None)):
         try:
             proc = await asyncio.wait_for(
                 _run_claude(req),
-                timeout=120,
+                timeout=300,
             )
         except asyncio.TimeoutError:
             raise HTTPException(status_code=504, detail="Claude timed out (120s)")
@@ -143,16 +146,20 @@ async def ask(req: AskRequest, authorization: str | None = Header(None)):
             detail=f"Failed to parse Claude output: {proc.stdout[:500]}",
         )
 
-    answer = result.get("result", proc.stdout)
+    answer = result.get("result", "")
+    if not answer:
+        # Fallback for error_max_turns or other subtypes
+        answer = result.get("subtype", "No answer returned")
     usage = {}
-    if "cost_usd" in result:
-        usage["cost_usd"] = result["cost_usd"]
+    if "total_cost_usd" in result:
+        usage["cost_usd"] = result["total_cost_usd"]
     if "num_turns" in result:
         usage["num_turns"] = result["num_turns"]
-    if "input_tokens" in result:
-        usage["input_tokens"] = result["input_tokens"]
-    if "output_tokens" in result:
-        usage["output_tokens"] = result["output_tokens"]
+    u = result.get("usage", {})
+    if "input_tokens" in u:
+        usage["input_tokens"] = u["input_tokens"]
+    if "output_tokens" in u:
+        usage["output_tokens"] = u["output_tokens"]
 
     return AskResponse(answer=answer, usage=usage, duration_seconds=round(elapsed, 2))
 
