@@ -1,8 +1,0 @@
-Metadata-Version: 2.4
-Name: coderev
-Version: 0.1.0
-Summary: Ask Claude Code questions about any repo via GitHub Codespaces
-Requires-Python: >=3.10
-Requires-Dist: click>=8.0
-Requires-Dist: httpx>=0.25
-Requires-Dist: rich>=13.0
