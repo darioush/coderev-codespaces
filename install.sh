@@ -8,7 +8,7 @@ if [ "${CODESPACES:-}" != "true" ]; then
 fi
 
 DOTFILES_DIR="/workspaces/.codespaces/.persistedshare/dotfiles"
-SERVER_DEST="/usr/local/bin/coderev-server.py"
+SERVER_DEST="$DOTFILES_DIR/server/api_server.py"
 AUTH_TOKEN_FILE="/tmp/coderev-auth-token"
 PID_FILE="/tmp/coderev-server.pid"
 PORT=8976
@@ -31,9 +31,7 @@ fi
 echo "Installing Python dependencies..."
 pip install --quiet fastapi uvicorn
 
-# ── Copy API server ──
-echo "Deploying API server..."
-cp "$DOTFILES_DIR/server/api_server.py" "$SERVER_DEST"
+# ── API server path ──
 chmod +x "$SERVER_DEST"
 
 # ── Generate auth token ──
