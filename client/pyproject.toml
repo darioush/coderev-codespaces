@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "coderev"
+version = "0.1.0"
+description = "Ask Claude Code questions about any repo via GitHub Codespaces"
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.0",
+    "httpx>=0.25",
+    "rich>=13.0",
+]
+
+[project.scripts]
+coderev = "coderev.cli:cli"
+
+[tool.setuptools.packages.find]
+where = ["src"]
