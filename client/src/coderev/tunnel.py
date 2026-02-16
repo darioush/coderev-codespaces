@@ -1,50 +1,53 @@
-"""Manage codespace port visibility and resolve the public URL."""
+"""Manage gh codespace ports forward subprocess."""
 
 import subprocess
+import time
 
 from coderev.config import SERVER_PORT
 
 
-def make_port_public(codespace_name: str, port: int = SERVER_PORT) -> None:
-    """Set the codespace port visibility to public."""
-    result = subprocess.run(
-        [
-            "gh", "codespace", "ports", "visibility",
-            f"{port}:public",
-            "-c", codespace_name,
-        ],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"Failed to make port {port} public: {result.stderr.strip()}"
+class Tunnel:
+    """Wraps `gh codespace ports forward` as a managed subprocess."""
+
+    def __init__(self, codespace_name: str, port: int = SERVER_PORT):
+        self.codespace_name = codespace_name
+        self.port = port
+        self._proc: subprocess.Popen | None = None
+
+    @property
+    def local_url(self) -> str:
+        return f"http://localhost:{self.port}"
+
+    def open(self) -> None:
+        if self._proc and self._proc.poll() is None:
+            return  # already running
+        self._proc = subprocess.Popen(
+            [
+                "gh", "codespace", "ports", "forward",
+                f"{self.port}:{self.port}",
+                "-c", self.codespace_name,
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
         )
+        # Give the tunnel a moment to establish
+        time.sleep(3)
+        if self._proc.poll() is not None:
+            stderr = self._proc.stderr.read().decode() if self._proc.stderr else ""
+            raise RuntimeError(f"Tunnel failed to start: {stderr}")
 
+    def close(self) -> None:
+        if self._proc and self._proc.poll() is None:
+            self._proc.terminate()
+            try:
+                self._proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self._proc.kill()
+            self._proc = None
 
-def get_public_url(codespace_name: str, port: int = SERVER_PORT) -> str:
-    """Get the public HTTPS URL for a codespace port."""
-    result = subprocess.run(
-        [
-            "gh", "codespace", "ports",
-            "-c", codespace_name,
-            "--json", "label,sourcePort,browseUrl",
-        ],
-        capture_output=True,
-        text=True,
-        timeout=15,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"Failed to list ports: {result.stderr.strip()}"
-        )
+    def __enter__(self):
+        self.open()
+        return self
 
-    import json
-    ports = json.loads(result.stdout)
-    for p in ports:
-        if p.get("sourcePort") == port:
-            return p["browseUrl"].rstrip("/")
-
-    # Fallback: construct from codespace name
-    return f"https://{codespace_name}-{port}.app.github.dev"
+    def __exit__(self, *_):
+        self.close()
