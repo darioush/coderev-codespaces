@@ -28,6 +28,7 @@ ALLOWED_TOOLS = [
 
 app = FastAPI(title="coderev")
 claude_lock = asyncio.Lock()
+auth_token_claimed = False
 
 
 def _verify_auth(authorization: str | None):
@@ -68,6 +69,16 @@ async def health():
         "commit": commit,
         "claude_version": claude_version,
     }
+
+
+@app.post("/auth-token")
+async def claim_auth_token():
+    """One-time endpoint to retrieve the bearer token. Disabled after first use."""
+    global auth_token_claimed
+    if auth_token_claimed:
+        raise HTTPException(status_code=410, detail="Token already claimed")
+    auth_token_claimed = True
+    return {"token": AUTH_TOKEN}
 
 
 class AskRequest(BaseModel):

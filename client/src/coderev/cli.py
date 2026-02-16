@@ -9,7 +9,7 @@ from rich.markdown import Markdown
 from rich.table import Table
 
 from coderev.api_client import ApiClient
-from coderev.auth import get_codespace_auth_token, get_github_token
+from coderev.auth import claim_auth_token, get_github_token
 from coderev.codespace import CodespaceManager
 from coderev.tunnel import Tunnel
 
@@ -35,18 +35,24 @@ def ask(repo, branch, question, files, diff_range, model, max_turns, stream):
     token = _get_token()
     mgr = CodespaceManager(token)
 
-    with console.status(f"Finding/creating codespace for {repo}@{branch}..."):
-        cs_name = mgr.find_or_create(repo, branch)
+    status = console.status(f"Finding codespace for {repo}@{branch}...")
+    with status:
+        cs_name = mgr.find_or_create(
+            repo, branch,
+            on_status=lambda msg: status.update(msg),
+        )
     console.print(f"Codespace ready: [bold]{cs_name}[/bold]")
 
     with Tunnel(cs_name) as tunnel:
-        with console.status("Fetching auth token from codespace..."):
-            auth_token = get_codespace_auth_token(cs_name)
+        with console.status("Waiting for coderev server..."):
+            # Poll /health first (unauthenticated), then claim token
+            tmp_client = ApiClient(tunnel.local_url, "")
+            health = tmp_client.wait_until_ready()
+
+        with console.status("Claiming auth token..."):
+            auth_token = claim_auth_token(tunnel.local_url)
 
         client = ApiClient(tunnel.local_url, auth_token)
-
-        with console.status("Waiting for coderev server..."):
-            health = client.wait_until_ready()
         console.print(
             f"Server ready -- repo: {health.get('repo_dir')}, "
             f"branch: {health.get('branch')}, commit: {health.get('commit')}"
@@ -168,7 +174,7 @@ def cleanup(delete):
             console.print(f"Stopping {name}...")
             mgr.stop(name)
             stopped += 1
-        elif state == "Shutdown" and delete:
+        elif state in ("Shutdown", "ShuttingDown") and delete:
             console.print(f"Deleting {name}...")
             mgr.delete(name)
             deleted += 1

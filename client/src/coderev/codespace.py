@@ -88,40 +88,53 @@ class CodespaceManager:
         resp.raise_for_status()
         return resp.json().get("codespaces", [])
 
-    def wait_until_available(self, codespace_name: str) -> dict:
+    def wait_until_available(
+        self, codespace_name: str, on_poll=None
+    ) -> dict:
         """Poll until codespace state is Available."""
         deadline = time.monotonic() + CODESPACE_BOOT_TIMEOUT
         while time.monotonic() < deadline:
             resp = self.client.get(f"/user/codespaces/{codespace_name}")
             resp.raise_for_status()
             cs = resp.json()
-            if cs.get("state") == "Available":
+            state = cs.get("state", "Unknown")
+            if state == "Available":
                 return cs
+            if on_poll:
+                on_poll(state)
             time.sleep(CODESPACE_POLL_INTERVAL)
         raise TimeoutError(
             f"Codespace {codespace_name} did not become Available "
             f"within {CODESPACE_BOOT_TIMEOUT}s"
         )
 
-    def find_or_create(self, repo: str, branch: str) -> str:
+    def find_or_create(self, repo: str, branch: str, on_status=None) -> str:
         """Find/create/start a codespace. Returns the codespace name."""
+        def _emit(msg):
+            if on_status:
+                on_status(msg)
+
         cs = self.find(repo, branch)
         if cs:
             state = cs.get("state", "Unknown")
             name = cs["name"]
             if state == "Available":
+                _emit(f"Reusing running codespace {name}")
                 return name
             if state in ("Shutdown", "ShuttingDown"):
+                _emit(f"Starting stopped codespace {name}...")
                 self.start(name)
-                self.wait_until_available(name)
+                self.wait_until_available(name, on_poll=lambda s: _emit(f"Codespace {name}: {s}"))
                 return name
-            # Other transitional states -- just wait
-            self.wait_until_available(name)
+            _emit(f"Codespace {name} is {state}, waiting...")
+            self.wait_until_available(name, on_poll=lambda s: _emit(f"Codespace {name}: {s}"))
             return name
 
+        _emit("Creating new codespace...")
         cs = self.create(repo, branch)
         name = cs["name"]
-        self.wait_until_available(name)
+        _emit(f"Created {name}, waiting for boot...")
+        self.wait_until_available(name, on_poll=lambda s: _emit(f"Codespace {name}: {s}"))
         return name
 
     def _repo_id(self, repo: str) -> int:

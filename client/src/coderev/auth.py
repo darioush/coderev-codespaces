@@ -27,20 +27,12 @@ def get_github_token() -> str:
     )
 
 
-def get_codespace_auth_token(codespace_name: str) -> str:
-    """Retrieve the coderev bearer token from inside a codespace."""
-    result = subprocess.run(
-        [
-            "gh", "codespace", "ssh",
-            "-c", codespace_name,
-            "--", "cat", "/tmp/coderev-auth-token",
-        ],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"Failed to fetch auth token from codespace: {result.stderr.strip()}"
-        )
-    return result.stdout.strip()
+def claim_auth_token(base_url: str) -> str:
+    """Claim the one-time auth token from the coderev server."""
+    import httpx
+
+    resp = httpx.post(f"{base_url}/auth-token", timeout=10)
+    if resp.status_code == 410:
+        raise RuntimeError("Auth token already claimed by another client")
+    resp.raise_for_status()
+    return resp.json()["token"]
