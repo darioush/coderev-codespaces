@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import time
+from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -82,6 +83,28 @@ async def claim_auth_token():
         raise HTTPException(status_code=410, detail="Token already claimed")
     auth_token_claimed = True
     return {"token": AUTH_TOKEN}
+
+
+class SetCredentialsRequest(BaseModel):
+    accessToken: str
+    refreshToken: str
+    expiresAt: int
+    scopes: list[str] = Field(default_factory=list)
+    subscriptionType: str = ""
+    rateLimitTier: str = ""
+
+
+@app.post("/credentials")
+async def set_credentials(req: SetCredentialsRequest, authorization: str | None = Header(None)):
+    """Write Claude OAuth credentials to ~/.claude/.credentials.json"""
+    _verify_auth(authorization)
+    cred_dir = Path.home() / ".claude"
+    cred_dir.mkdir(parents=True, exist_ok=True)
+    cred_path = cred_dir / ".credentials.json"
+    cred_data = {"claudeAiOauth": req.model_dump()}
+    cred_path.write_text(json.dumps(cred_data))
+    cred_path.chmod(0o600)
+    return {"status": "ok"}
 
 
 class AskRequest(BaseModel):

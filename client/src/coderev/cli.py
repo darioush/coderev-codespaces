@@ -9,7 +9,7 @@ from rich.markdown import Markdown
 from rich.table import Table
 
 from coderev.api_client import ApiClient
-from coderev.auth import claim_auth_token, get_github_token
+from coderev.auth import get_auth_token, get_claude_oauth_credentials, get_github_token
 from coderev.codespace import CodespaceManager
 from coderev.tunnel import Tunnel
 
@@ -49,10 +49,18 @@ def ask(repo, branch, question, files, diff_range, model, max_turns, stream, ses
             tmp_client = ApiClient(tunnel.local_url, "")
             health = tmp_client.wait_until_ready()
 
-        with console.status("Claiming auth token..."):
-            auth_token = claim_auth_token(tunnel.local_url)
+        with console.status("Authenticating..."):
+            auth_token = get_auth_token(tunnel.local_url, cs_name)
 
         client = ApiClient(tunnel.local_url, auth_token)
+
+        with console.status("Pushing Claude credentials..."):
+            try:
+                creds = get_claude_oauth_credentials()
+                client.set_credentials(creds)
+            except RuntimeError as e:
+                console.print(f"[yellow]Warning:[/yellow] {e} (falling back to ANTHROPIC_API_KEY)")
+
         console.print(
             f"Server ready -- repo: {health.get('repo_dir')}, "
             f"branch: {health.get('branch')}, commit: {health.get('commit')}"

@@ -34,6 +34,16 @@ class ApiClient:
             f"Server not ready within {HEALTH_POLL_TIMEOUT}s. Last error: {last_err}"
         )
 
+    def set_credentials(self, credentials: dict) -> None:
+        """POST /credentials to write Claude OAuth creds to the codespace."""
+        resp = httpx.post(
+            f"{self.base_url}/credentials",
+            json=credentials,
+            headers=self._headers(),
+            timeout=10,
+        )
+        resp.raise_for_status()
+
     def ask(
         self,
         question: str,
