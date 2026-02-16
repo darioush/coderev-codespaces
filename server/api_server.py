@@ -22,12 +22,16 @@ ALLOWED_TOOLS = [
     "Glob",
     "Grep",
     "Bash(git *)",
+    "Bash(gh *)",
     "Bash(cargo *)",
     "Bash(ls *)",
     "Bash(find *)",
     "Bash(wc *)",
     "Bash(head *)",
     "Bash(tail *)",
+    "Bash(cat *)",
+    "Bash(grep *)",
+    "Bash(rg *)",
 ]
 
 app = FastAPI(title="coderev")
