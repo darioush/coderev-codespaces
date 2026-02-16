@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-set -euo pipefail
+
+# Log everything to a file so we can debug failures
+exec > /tmp/coderev-install.log 2>&1
+set -x
 
 # Only run inside GitHub Codespaces
 if [ "${CODESPACES:-}" != "true" ]; then
@@ -22,14 +25,13 @@ fi
 # ── Install Claude Code ──
 if ! command -v claude &>/dev/null; then
     echo "Installing Claude Code..."
-    curl -fsSL https://claude.ai/install.sh | bash
-    # Add to PATH for this session
+    curl -fsSL https://claude.ai/install.sh | bash || true
     export PATH="$HOME/.claude/bin:$PATH"
 fi
 
 # ── Install Python dependencies ──
 echo "Installing Python dependencies..."
-pip install --quiet fastapi uvicorn
+pip install --quiet fastapi uvicorn || pip3 install --quiet fastapi uvicorn
 
 # ── API server path ──
 chmod +x "$SERVER_DEST"
