@@ -90,10 +90,12 @@ class AskRequest(BaseModel):
     diff_range: str | None = None
     model: str | None = None
     max_turns: int = 30
+    session_id: str | None = None  # resume a previous conversation
 
 
 class AskResponse(BaseModel):
     answer: str
+    session_id: str | None = None
     usage: dict = Field(default_factory=dict)
     duration_seconds: float
 
@@ -117,6 +119,8 @@ def _build_claude_cmd(req: AskRequest, stream: bool = False) -> list[str]:
         "--max-turns", str(req.max_turns),
         "--output-format", "stream-json" if stream else "json",
     ]
+    if req.session_id:
+        cmd.extend(["--resume", req.session_id])
     if req.model:
         cmd.extend(["--model", req.model])
     return cmd
@@ -161,7 +165,8 @@ async def ask(req: AskRequest, authorization: str | None = Header(None)):
     if "output_tokens" in u:
         usage["output_tokens"] = u["output_tokens"]
 
-    return AskResponse(answer=answer, usage=usage, duration_seconds=round(elapsed, 2))
+    session_id = result.get("session_id")
+    return AskResponse(answer=answer, session_id=session_id, usage=usage, duration_seconds=round(elapsed, 2))
 
 
 async def _run_claude(req: AskRequest) -> subprocess.CompletedProcess:

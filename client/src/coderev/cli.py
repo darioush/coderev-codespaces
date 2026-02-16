@@ -30,7 +30,8 @@ def cli():
 @click.option("--model", "-m", help="Claude model (e.g. sonnet, opus)")
 @click.option("--max-turns", default=30, help="Max agent turns")
 @click.option("--stream", is_flag=True, help="Stream response via SSE")
-def ask(repo, branch, question, files, diff_range, model, max_turns, stream):
+@click.option("--session", "session_id", help="Resume a previous session")
+def ask(repo, branch, question, files, diff_range, model, max_turns, stream, session_id):
     """Ask Claude a question about code in REPO on BRANCH."""
     token = _get_token()
     mgr = CodespaceManager(token)
@@ -58,12 +59,12 @@ def ask(repo, branch, question, files, diff_range, model, max_turns, stream):
         )
 
         if stream:
-            _ask_stream(client, question, list(files), diff_range, model, max_turns)
+            _ask_stream(client, question, list(files), diff_range, model, max_turns, session_id)
         else:
-            _ask_sync(client, question, list(files), diff_range, model, max_turns)
+            _ask_sync(client, question, list(files), diff_range, model, max_turns, session_id)
 
 
-def _ask_sync(client, question, files, diff_range, model, max_turns):
+def _ask_sync(client, question, files, diff_range, model, max_turns, session_id):
     with console.status("Claude is thinking..."):
         result = client.ask(
             question=question,
@@ -71,6 +72,7 @@ def _ask_sync(client, question, files, diff_range, model, max_turns):
             diff_range=diff_range,
             model=model,
             max_turns=max_turns,
+            session_id=session_id,
         )
     console.print()
     console.print(Markdown(result["answer"]))
@@ -83,9 +85,12 @@ def _ask_sync(client, question, files, diff_range, model, max_turns):
     if "num_turns" in usage:
         meta_parts.append(f"[dim]{usage['num_turns']} turns[/dim]")
     console.print(" | ".join(meta_parts))
+    if result.get("session_id"):
+        console.print(f"\n[dim]Session: {result['session_id']}[/dim]")
+        console.print("[dim]Continue with: coderev ask ... --session <id>[/dim]")
 
 
-def _ask_stream(client, question, files, diff_range, model, max_turns):
+def _ask_stream(client, question, files, diff_range, model, max_turns, session_id):
     for data in client.ask_stream(
         question=question,
         files=files or None,

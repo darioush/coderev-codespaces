@@ -40,7 +40,8 @@ class ApiClient:
         files: list[str] | None = None,
         diff_range: str | None = None,
         model: str | None = None,
-        max_turns: int = 10,
+        max_turns: int = 30,
+        session_id: str | None = None,
     ) -> dict:
         """POST /ask and return the response dict."""
         payload: dict = {"question": question, "max_turns": max_turns}
@@ -50,6 +51,8 @@ class ApiClient:
             payload["diff_range"] = diff_range
         if model:
             payload["model"] = model
+        if session_id:
+            payload["session_id"] = session_id
 
         resp = httpx.post(
             f"{self.base_url}/ask",
