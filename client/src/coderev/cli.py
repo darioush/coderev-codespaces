@@ -11,7 +11,7 @@ from rich.table import Table
 from coderev.api_client import ApiClient
 from coderev.auth import claim_auth_token, get_github_token
 from coderev.codespace import CodespaceManager
-from coderev.tunnel import Tunnel
+from coderev.tunnel import get_public_url, make_port_public
 
 console = Console()
 
@@ -43,25 +43,28 @@ def ask(repo, branch, question, files, diff_range, model, max_turns, stream):
         )
     console.print(f"Codespace ready: [bold]{cs_name}[/bold]")
 
-    with Tunnel(cs_name) as tunnel:
-        with console.status("Waiting for coderev server..."):
-            # Poll /health first (unauthenticated), then claim token
-            tmp_client = ApiClient(tunnel.local_url, "")
-            health = tmp_client.wait_until_ready()
+    with console.status("Making port public..."):
+        make_port_public(cs_name)
+        base_url = get_public_url(cs_name)
+    console.print(f"Server URL: [dim]{base_url}[/dim]")
 
-        with console.status("Claiming auth token..."):
-            auth_token = claim_auth_token(tunnel.local_url)
+    with console.status("Waiting for coderev server..."):
+        tmp_client = ApiClient(base_url, "")
+        health = tmp_client.wait_until_ready()
 
-        client = ApiClient(tunnel.local_url, auth_token)
-        console.print(
-            f"Server ready -- repo: {health.get('repo_dir')}, "
-            f"branch: {health.get('branch')}, commit: {health.get('commit')}"
-        )
+    with console.status("Claiming auth token..."):
+        auth_token = claim_auth_token(base_url)
 
-        if stream:
-            _ask_stream(client, question, list(files), diff_range, model, max_turns)
-        else:
-            _ask_sync(client, question, list(files), diff_range, model, max_turns)
+    client = ApiClient(base_url, auth_token)
+    console.print(
+        f"Server ready -- repo: {health.get('repo_dir')}, "
+        f"branch: {health.get('branch')}, commit: {health.get('commit')}"
+    )
+
+    if stream:
+        _ask_stream(client, question, list(files), diff_range, model, max_turns)
+    else:
+        _ask_sync(client, question, list(files), diff_range, model, max_turns)
 
 
 def _ask_sync(client, question, files, diff_range, model, max_turns):
