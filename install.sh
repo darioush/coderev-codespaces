@@ -29,7 +29,7 @@ fi
 
 # ── Install Python dependencies ──
 echo "Installing Python dependencies..."
-pip install --user --quiet fastapi uvicorn
+pip install --quiet fastapi uvicorn
 
 # ── Copy API server ──
 echo "Deploying API server..."
